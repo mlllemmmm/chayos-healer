@@ -6,3 +6,26 @@ node_modules/
 venv/
 __pycache__/
 vector_db/
+# Python
+__pycache__/
+*.pyc
+.env
+
+# Node
+node_modules/
+npm-debug.log
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+
+# DB / Vector
+*.db
+vector_db/
+
+# Build
+dist/
+build/

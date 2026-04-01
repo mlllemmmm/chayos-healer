@@ -50,12 +50,43 @@ export default function IncidentLogs({ logs }) {
                   <Icon className="w-5 h-5" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-zinc-100 text-sm font-medium">{log.message}</p>
-                  <p className="text-xs opacity-75 mt-1 font-mono">
-                    {new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    <span className="mx-2 text-zinc-500">|</span>
+                  <div className="flex items-start justify-between">
+                    <p className="text-zinc-100 text-sm font-medium">{log.message}</p>
+                    {log.status && (
+                       <span className={cn(
+                          "ml-2 text-xs px-2 py-0.5 rounded-full border bg-zinc-950/50 font-medium whitespace-nowrap flex items-center gap-1",
+                          log.status === 'success' ? 'border-emerald-500/30 text-emerald-400' :
+                          log.status === 'failure' ? 'border-red-500/30 text-red-400' :
+                          'border-amber-500/30 text-amber-400'
+                       )}>
+                         {log.status === 'success' ? '🟢 Success' : log.status === 'failure' ? '🔴 Failure' : '🟡 In-Progress'}
+                       </span>
+                    )}
+                  </div>
+                  <div className="text-xs opacity-75 mt-1.5 font-mono flex items-center gap-2 flex-wrap">
+                    <span>{new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                    <span className="text-zinc-500">•</span>
                     <span className="text-zinc-400">{log.source || 'system'}</span>
-                  </p>
+                    
+                    {log.event && (
+                      <>
+                        <span className="text-zinc-600">|</span>
+                        <span className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">{log.event}</span>
+                      </>
+                    )}
+                    {log.issue && (
+                      <>
+                        <span className="text-zinc-600">|</span>
+                        <span className="px-1.5 py-0.5 rounded bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-500/20">🎯 {log.issue}</span>
+                      </>
+                    )}
+                    {log.action && (
+                      <>
+                        <span className="text-zinc-600">|</span>
+                        <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">⚡ {log.action}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
             );

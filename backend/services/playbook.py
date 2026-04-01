@@ -2,34 +2,134 @@ import re
 import os
 
 def load_playbook():
-    base_dir = os.path.dirname(os.path.dirname(__file__))  # backend/
-    file_path = os.path.join(base_dir, "knowledge", "remediation_guide.md")
+    return {
 
-    with open(file_path, "r") as f:
-        return f.read()
+        # 1️⃣ MongoDB Down
+        "mongodb_down": {
+            "keywords": [
+                "connection refused",
+                "mongo not reachable",
+                "mongo db down",
+                "container exited",
+                "database down"
+            ],
+            "action": "restart_mongo",
+            "verify": "check_mongo"
+        },
 
-    sections = content.split("# Service:")
-    playbooks = []
+        # 2️⃣ Backend API Down
+        "backend_down": {
+            "keywords": [
+                "502 bad gateway",
+                "backend unreachable",
+                "api timeout",
+                "connection failed",
+                "server error"
+            ],
+            "action": "restart_backend",
+            "verify": "check_backend"
+        },
 
-    for sec in sections[1:]:
-        lines = sec.strip().split("\n")
+        # 3️⃣ High CPU Usage
+        "high_cpu": {
+            "keywords": [
+                "cpu usage high",
+                "cpu spike",
+                "100% cpu",
+                "resource exhaustion"
+            ],
+            "action": "scale_up_backend",
+            "verify": "check_cpu"
+        },
 
-        service = lines[0].strip()
-        error = None
-        fix = None
+        # 4️⃣ High Memory Usage
+        "high_memory": {
+            "keywords": [
+                "out of memory",
+                "memory leak",
+                "ram full",
+                "memory usage high"
+            ],
+            "action": "restart_backend",
+            "verify": "check_memory"
+        },
 
-        for line in lines:
-            if "Error:" in line:
-                error = line.replace("## Error:", "").strip()
-            if "Fix:" in line:
-                fix_line = line.replace("- **Fix:**", "").strip()
-                fix = [cmd.strip("`") for cmd in fix_line.split("or")]
+        # 5️⃣ Disk Space Full
+        "disk_full": {
+            "keywords": [
+                "no space left",
+                "disk full",
+                "storage exhausted"
+            ],
+            "action": "cleanup_disk",
+            "verify": "check_disk"
+        },
 
-        if error and fix:
-            playbooks.append({
-                "service": service,
-                "error": error,
-                "fix": fix
-            })
+        # 6️⃣ Service Crash Loop
+        "crash_loop": {
+            "keywords": [
+                "crash loop",
+                "restarting again and again",
+                "container restarting"
+            ],
+            "action": "restart_service",
+            "verify": "check_service"
+        },
 
-    return playbooks
+        # 7️⃣ Network / DNS Failure
+        "network_issue": {
+            "keywords": [
+                "getaddrinfo failed",
+                "dns error",
+                "network unreachable",
+                "temporary failure in name resolution"
+            ],
+            "action": "restart_network",
+            "verify": "check_network"
+        },
+
+        # 8️⃣ Database Slow Response
+        "db_slow": {
+            "keywords": [
+                "query timeout",
+                "slow database",
+                "db latency high"
+            ],
+            "action": "restart_mongo",
+            "verify": "check_mongo"
+        },
+
+        # 9️⃣ Authentication Failure
+        "auth_failure": {
+            "keywords": [
+                "unauthorized",
+                "invalid token",
+                "authentication failed",
+                "403 forbidden"
+            ],
+            "action": "refresh_auth",
+            "verify": "check_auth"
+        },
+
+        # 🔟 External API Failure (VERY IMPRESSIVE)
+        "external_api_down": {
+            "keywords": [
+                "api connection error",
+                "third party api failed",
+                "timeout from external service"
+            ],
+            "action": "retry_api",
+            "verify": "check_api"
+        },
+
+        # 1️⃣1️⃣ Docker Engine Issue
+        "docker_issue": {
+            "keywords": [
+                "docker not running",
+                "cannot connect to docker daemon",
+                "docker service down"
+            ],
+            "action": "restart_docker",
+            "verify": "check_docker"
+        }
+    }

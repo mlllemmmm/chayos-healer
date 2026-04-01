@@ -1,6 +1,7 @@
 import asyncio
 from services.logger import add_log
-from services.docker_utils import get_mongo_container, restart_container
+from services.docker_utils import get_mongo_container
+from services.healer import trigger_healer
 
 async def start_monitoring():
     """
@@ -15,23 +16,11 @@ async def start_monitoring():
                 container.reload()
                 if container.status != "running":
                     # Detected an offline database!
-                    add_log("MongoDB DOWN detected", log_type="error", source="monitor-agent")
-                    
-                    # Trigger the healing function
-                    add_log("Restarting MongoDB container...", log_type="warning", source="auto-healer")
-                    success = restart_container(container)
+                    trigger_healer(issue="mongodb_down", raw_error="mongo db down", source="monitor")
                     
                     # Wait briefly to ensure state transitions properly
                     await asyncio.sleep(2)
-                    
-                    if success:
-                        add_log("MongoDB successfully healed", log_type="info", source="auto-healer")
-                    else:
-                        add_log("Healing failed", log_type="error", source="auto-healer")
             else:
-                 # Didn't find container
-                 # Commenting out so it doesn't spam missing container logs during dev
-                 # print("MongoDB container not found. Is it initialized?")
                  pass
                 
         except Exception as e:
