@@ -1,7 +1,7 @@
 from groq import Groq
 import os
 import json
-from services.playbook import load_playbook
+from services.playbook_manager import get_playbook_db
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -9,7 +9,7 @@ load_dotenv()
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def get_ai_fix(error_message: str):
-    playbook = load_playbook()
+    playbook = get_playbook_db()
     playbook_context = json.dumps(playbook, indent=2)
 
     system_prompt = f"""

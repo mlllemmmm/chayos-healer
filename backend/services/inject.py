@@ -95,3 +95,43 @@ def inject_api():
 def inject_docker():
     handle_injection("docker_issue", "docker not running", "Docker Engine Down")
     return {"status": "Docker Issue injected"}
+
+import subprocess
+import sys
+from services.state import state
+
+from services.docker_utils import get_backend_container, disconnect_from_network, inject_memory_pressure
+
+@router.post("/inject-memory-pressure")
+def inject_memory_pressure_route():
+    container = get_backend_container()
+    if container:
+        success = inject_memory_pressure(container)
+        if success:
+            handle_injection("container_memory_pressure", "OOM detected: memory limit exceeded", "Memory Pressure")
+            return {"status": "Container Memory Pressure injected"}
+        return {"status": "Failed to inject memory pressure"}
+    return {"status": "Backend container not found"}
+
+@router.post("/inject-network-isolation")
+def inject_network_isolation():
+    container = get_backend_container()
+    if container:
+        success = disconnect_from_network(container, "chaos-net")
+        if success:
+            handle_injection("container_network_isolation", "connection timeout", "Network Isolation")
+            return {"status": "Container Network Isolation injected"}
+        return {"status": "Failed to disconnect container"}
+    return {"status": "Backend container not found"}
+
+@router.post("/inject-port-conflict")
+def inject_port_conflict():
+    try:
+        if state.port_conflict_process is None or state.port_conflict_process.poll() is not None:
+            proc = subprocess.Popen([sys.executable, "-m", "http.server", "8000"])
+            state.port_conflict_process = proc
+            handle_injection("port_conflict", "Address already in use", "Port Conflict")
+            return {"status": "Port Conflict injected"}
+    except Exception as e:
+        pass
+    return {"status": "Port conflict already running"}

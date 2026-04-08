@@ -56,3 +56,88 @@ def stop_container(container) -> bool:
     except Exception as e:
         print(f"Failed to stop container: {e}")
         return False
+
+def get_backend_container(client=None) -> Optional[docker.models.containers.Container]:
+    """Dynamically searches for the backend container."""
+    if not client:
+        client = get_docker_client()
+    if not client:
+        return None
+
+    try:
+        containers = client.containers.list(all=True)
+        for c in containers:
+            if "backend" in c.name or "mushroom-app" in c.name: # existing executor logic checks for mushroom-app
+                return c
+    except Exception as e:
+        print(f"Failed to list containers for backend: {e}")
+    return None
+
+def disconnect_from_network(container, network_name="chaos-net") -> bool:
+    """Disconnects a container from a specified Docker network."""
+    client = get_docker_client()
+    if not client:
+        return False
+    try:
+        network = client.networks.get(network_name)
+        network.disconnect(container)
+        return True
+    except Exception as e:
+        print(f"Failed to disconnect from network {network_name}: {e}")
+        return False
+
+def connect_to_network(container, network_name="chaos-net") -> bool:
+    """Connects a container to a specified Docker network."""
+    client = get_docker_client()
+    if not client:
+        return False
+    try:
+        network = client.networks.get(network_name)
+        network.connect(container)
+        return True
+    except Exception as e:
+        print(f"Failed to connect to network {network_name}: {e}")
+        return False
+
+def inject_memory_pressure(container, target_mb=500) -> bool:
+    """Safely executes a Python script inside the container to allocate memory."""
+    try:
+        # script allocates approx target_mb megabytes using a list of strings
+        cmd = f"python3 -c \"a=[]; import time; [a.append(' ' * 1024 * 1024) for _ in range({target_mb})]; time.sleep(60)\""
+        container.exec_run(cmd, detach=True)
+        return True
+    except Exception as e:
+        print(f"Failed to inject memory pressure into container: {e}")
+        return False
+
+def scale_up_backend(replica_id: int) -> bool:
+    """Dynamically finds the base backend container and clones it for autoscaling."""
+    client = get_docker_client()
+    if not client:
+        return False
+        
+    base = get_backend_container(client)
+    if not base:
+        print("No base backend container found to scale from.")
+        return False
+        
+    try:
+        # Determine base container details
+        image = base.image
+        networks = base.attrs['NetworkSettings']['Networks']
+        network_name = list(networks.keys())[0] if networks else "bridge"
+        
+        new_name = f"backend_replica_{replica_id}"
+        print(f"Spawning genuine docker container: {new_name} using image {image.tags[0] if image.tags else image.id} on network {network_name}")
+        
+        # Deploy actual container
+        client.containers.run(
+            image,
+            name=new_name,
+            detach=True,
+            network=network_name
+        )
+        return True
+    except Exception as e:
+        print(f"Failed to spawn replica container {replica_id}: {e}")
+        return False

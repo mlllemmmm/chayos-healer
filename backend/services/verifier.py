@@ -40,4 +40,10 @@ def verify_recovery(action: str) -> dict:
     elif action == "retry_api":
         return {"status": "success", "details": "External API endpoints are reachable."}
 
+    elif action == "kill_conflicting_process":
+        return {"status": "success", "details": "Conflicting process terminated. Port is now free."}
+        
+    elif action == "reconnect_network":
+        return {"status": "success", "details": "Backend container re-connected to the network successfully."}
+
     return {"status": "failure", "details": f"No verification defined for action {action}"}

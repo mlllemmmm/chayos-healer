@@ -131,5 +131,39 @@ def load_playbook():
             ],
             "action": "restart_docker",
             "verify": "check_docker"
+        },
+
+        # 1️⃣2️⃣ Container Network Isolation
+        "container_network_isolation": {
+            "keywords": [
+                "network isolated",
+                "chaos-net disconnect",
+                "connection timeout",
+                "ECONNREFUSED"
+            ],
+            "action": "reconnect_network",
+            "verify": "check_network"
+        },
+
+        # 1️⃣3️⃣ Container Memory Pressure
+        "container_memory_pressure": {
+            "keywords": [
+                "OOM detected",
+                "memory limit exceeded",
+                "container out of memory"
+            ],
+            "action": "restart_backend",
+            "verify": "check_memory"
+        },
+        
+        # 1️⃣4️⃣ Port Conflict
+        "port_conflict": {
+            "keywords": [
+                "Address already in use",
+                "bind failed",
+                "port is allocated"
+            ],
+            "action": "kill_conflicting_process",
+            "verify": "check_port"
         }
     }

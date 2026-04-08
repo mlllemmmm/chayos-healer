@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -6,9 +9,17 @@ from services.inject import router as inject_router
 from services.monitor import start_monitoring
 from services.logger import get_logs
 from services.docker_utils import get_mongo_container, restart_container
-
-# ✅ NEW IMPORT
 import psutil
+import time
+from fastapi import Request
+
+from services.state import state
+from services.playbook_manager import router as playbook_router
+from services.chaos_engine import router as chaos_router
+from services.scaler import router as scaler_router
+from services.metrics import router as metrics_router
+from services.metrics import collect_metrics_loop
+from services.scaler import monitor_and_scale
 
 app = FastAPI()
 
@@ -20,14 +31,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.middleware("http")
+async def latency_middleware(request: Request, call_next):
+    if state.latency_spiked:
+        await asyncio.sleep(state.latency_delay)
+    response = await call_next(request)
+    return response
+
 app.include_router(inject_router)
+app.include_router(playbook_router, prefix="/playbooks", tags=["playbooks"])
+app.include_router(chaos_router, prefix="/chaos", tags=["chaos"])
+app.include_router(scaler_router, prefix="/scaling", tags=["scaling"])
+app.include_router(metrics_router, prefix="/metrics", tags=["metrics"])
 
 from services.healer import trigger_healer
 
 @app.on_event("startup")
 async def startup_event():
-    # Run the background monitor indefinitely
+    # Run the background monitors indefinitely
     asyncio.create_task(start_monitoring())
+    asyncio.create_task(collect_metrics_loop())
+    asyncio.create_task(monitor_and_scale())
 
 @app.get("/")
 def home():
@@ -67,10 +91,10 @@ def auto_heal():
 # =========================
 # 🔥 NEW: METRICS ENDPOINT
 # =========================
-@app.get("/metrics")
+@app.get("/metrics/standard")
 def get_metrics():
     try:
-        cpu = psutil.cpu_percent(interval=0.5)
+        cpu = psutil.cpu_percent(interval=None)
         memory = psutil.virtual_memory().used / (1024 ** 3)  # GB
         uptime = 99.9  # You can later compute real uptime
 

@@ -1,48 +1,49 @@
-import { LayoutDashboard, ScrollText, Settings, LogOut, Activity } from 'lucide-react';
+import { LayoutDashboard, ScrollText, Settings, LogOut, Activity, BookOpen } from 'lucide-react';
 import { cn } from '../utils';
 
 export default function Sidebar({ activeTab, setActiveTab, onLogout }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'playbooks', label: 'Playbooks', icon: BookOpen },
     { id: 'logs', label: 'Incident Logs', icon: ScrollText },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
   return (
-    <aside className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full shrink-0">
-      <div className="h-16 flex items-center px-6 border-b border-zinc-800 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
-            <Activity className="w-5 h-5 text-indigo-400" />
+    <aside className="w-64 glass-card !rounded-none !border-y-0 !border-l-0 !shadow-none flex flex-col h-full shrink-0 z-30">
+      <div className="h-20 flex items-center px-6 border-b border-border shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-[0_0_15px_rgba(124,92,255,0.2)]">
+            <Activity className="w-6 h-6 text-primary" />
           </div>
-          <span className="font-semibold text-zinc-100 tracking-tight">SRE Monitor</span>
+          <span className="font-bold text-text-primary tracking-tight text-lg">SRE Monitor</span>
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-1">
+      <nav className="flex-1 px-4 py-8 space-y-2">
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setActiveTab(item.id)}
             className={cn(
-              "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+              "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-300",
               activeTab === item.id 
-                ? "bg-zinc-800 text-zinc-100 shadow-sm shadow-black/20" 
-                : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50"
+                ? "bg-primary/20 text-primary border border-primary/30 shadow-[0_0_10px_rgba(124,92,255,0.1)]" 
+                : "text-text-secondary hover:text-text-primary hover:bg-surface border border-transparent hover:border-border"
             )}
           >
-            <item.icon className={cn("w-4 h-4", activeTab === item.id ? "text-indigo-400" : "text-zinc-500")} />
+            <item.icon className={cn("w-5 h-5 transition-colors", activeTab === item.id ? "text-primary" : "text-text-secondary group-hover:text-text-primary")} />
             {item.label}
           </button>
         ))}
       </nav>
 
-      <div className="p-4 border-t border-zinc-800 shrink-0">
+      <div className="p-6 border-t border-border shrink-0">
         <button 
           onClick={onLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-semibold text-text-secondary hover:text-error hover:bg-error/10 hover:border-error/20 border border-transparent rounded-xl transition-all duration-300 group"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-5 h-5 group-hover:block" />
           Disconnect
         </button>
       </div>
