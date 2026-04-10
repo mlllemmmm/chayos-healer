@@ -3,11 +3,12 @@ import StatusPanel from '../components/StatusPanel';
 import ControlPanel from '../components/ControlPanel';
 import IncidentLogs from '../components/IncidentLogs';
 import MetricsChart from '../components/MetricsChart';
-import ChaosPanel from '../components/ChaosPanel';
 import ScalerWidget from '../components/ScalerWidget';
 import AlertToasts from '../components/AlertToasts';
 import Sidebar from '../components/Sidebar';
 import PlaybookManager from '../components/PlaybookManager';
+import MetricsSection from '../components/MetricsSection';
+import AdaptiveHealerPanel from '../components/AdaptiveHealerPanel';
 
 const MOCK_API = 'http://127.0.0.1:8000';
 
@@ -16,114 +17,164 @@ export default function DashboardLayout({ onLogout }) {
   const [status, setStatus] = useState({ mongo: 'healthy', backend: 'healthy' });
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentIncident, setCurrentIncident] = useState(null);
+  const [adaptiveResult, setAdaptiveResult] = useState(null);
+  const [metrics, setMetrics] = useState({ cpu: 32.4, memory: 4.2, uptime: 99.99 });
 
   useEffect(() => {
     fetchStatus();
     fetchLogs();
-    const int = setInterval(() => {
+
+    const interval = setInterval(() => {
       fetchStatus();
       fetchLogs();
+
+      setMetrics((prev) => ({
+        ...prev,
+        cpu: Math.max(10, Math.min(90, prev.cpu + (Math.random() * 10 - 5))),
+        memory: Math.max(2, Math.min(16, prev.memory + (Math.random() * 0.4 - 0.2))),
+      }));
     }, 2000);
-    return () => clearInterval(int);
+
+    return () => clearInterval(interval);
   }, []);
 
   const fetchStatus = async () => {
     try {
       const res = await fetch(`${MOCK_API}/status`);
       if (res.ok) setStatus(await res.json());
-    } catch (e) {}
+    } catch {
+      console.warn('Failed to fetch status');
+    }
   };
 
   const fetchLogs = async () => {
     try {
       const res = await fetch(`${MOCK_API}/logs`);
       if (res.ok) setLogs(await res.json());
-    } catch (e) {}
+    } catch {
+      console.warn('Failed to fetch logs');
+    }
   };
 
   const handleInject = async (type) => {
     setIsLoading(true);
     try {
-      await fetch(`${MOCK_API}/inject-${type}`, {
+      const res = await fetch(`${MOCK_API}/inject-${type}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
       });
-      fetchLogs();
-    } catch (e) {}
+
+      if (res.ok) {
+        const data = await res.json();
+
+        if (type === 'unknown' && data.incident) {
+          setCurrentIncident(data.incident);
+          setAdaptiveResult(null);
+        }
+
+        await fetchLogs();
+        await fetchStatus();
+      }
+    } catch {
+      console.warn(`Failed to inject ${type}`);
+    }
+    setIsLoading(false);
+  };
+
+  const handleAdaptiveHeal = async (incident) => {
+    if (!incident) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${MOCK_API}/adaptive-heal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(incident),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAdaptiveResult(data);
+        await fetchLogs();
+      }
+    } catch {
+      console.warn('Adaptive heal failed');
+    }
+    setIsLoading(false);
+  };
+
+  const handleTeachFix = async (incident, actionId) => {
+    if (!incident) return;
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${MOCK_API}/teach-fix`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ incident, action_id: actionId }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAdaptiveResult(data);
+        await fetchLogs();
+      }
+    } catch {
+      console.warn('Teach fix failed');
+    }
     setIsLoading(false);
   };
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden text-text-primary relative font-sans align-baseline">
-      <AlertToasts />
-      
-      {/* Background Parallax Blobs */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40vw] h-[40vh] bg-primary/20 rounded-full blur-[120px] animate-blob-drift" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vh] bg-secondary/15 rounded-full blur-[120px] animate-blob-drift" style={{ animationDelay: '-10s', animationDirection: 'reverse' }} />
-      </div>
+    <div className="flex h-screen w-full bg-background text-text-primary">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
 
-      <div className="z-20 relative h-full flex flex-col">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
-      </div>
+      <main className="flex-1 overflow-y-auto p-8 space-y-8">
+        <h1 className="text-4xl font-bold">System Operations</h1>
 
-      <main className="flex-1 overflow-y-auto w-full relative z-10 scroll-smooth">
-        <div className="max-w-6xl mx-auto p-8 relative w-full space-y-8">
-          <header className="mb-12">
-            <h1 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-text-primary to-text-secondary pb-1">
-              System Operations
-            </h1>
-            <p className="text-text-secondary mt-3 text-base max-w-xl">
-              Monitor vital system parameters, manage incident logs, and control failure injection routines in real-time.
-            </p>
-          </header>
+        {activeTab === 'dashboard' && (
+          <>
+            <StatusPanel status={status} />
 
-          {activeTab === 'dashboard' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out">
-              <StatusPanel status={status} />
-              
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <MetricsChart />
-                <div className="lg:col-span-1">
-                  <ScalerWidget />
-                </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <MetricsChart />
+              <ScalerWidget />
+            </div>
+
+            <MetricsSection metrics={metrics} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2">
+                <IncidentLogs logs={logs} />
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2">
-                  <IncidentLogs logs={logs} />
-                </div>
-                <div className="lg:col-span-1 space-y-8">
-                  <ChaosPanel />
-                  <ControlPanel
-                    onInject={handleInject}
-                    onRefreshLogs={fetchLogs}
-                    isLoading={isLoading}
-                  />
-                </div>
-              </div>
+              <ControlPanel
+                onInject={handleInject}
+                onRefreshLogs={fetchLogs}
+                isLoading={isLoading}
+              />
             </div>
-          )}
 
-          {activeTab === 'playbooks' && (
-            <div className="h-[calc(100vh-140px)] animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out">
-              <PlaybookManager />
-            </div>
-          )}
+            <AdaptiveHealerPanel
+              currentIncident={currentIncident}
+              onAdaptiveHeal={handleAdaptiveHeal}
+              onTeachFix={handleTeachFix}
+              adaptiveResult={adaptiveResult}
+              isLoading={isLoading}
+            />
+          </>
+        )}
 
-          {activeTab === 'logs' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out">
-              <IncidentLogs logs={logs} />
-            </div>
-          )}
+        {activeTab === 'playbooks' && <PlaybookManager />}
+        {activeTab === 'logs' && <IncidentLogs logs={logs} />}
 
-          {activeTab === 'settings' && (
-            <div className="glass-card text-center py-20 animate-in fade-in slide-in-from-bottom-8 duration-700 ease-out">
-              <h3 className="text-2xl font-bold text-text-primary mb-3">Platform Settings</h3>
-              <p className="text-text-secondary">Agent configurations and alerting rules are managed via CI/CD for this environment.</p>
-            </div>
-          )}
-        </div>
+        {activeTab === 'settings' && (
+          <div className="text-center py-20">
+            <h3 className="text-2xl font-bold">Platform Settings</h3>
+            <p>Managed via CI/CD</p>
+          </div>
+        )}
       </main>
     </div>
   );
