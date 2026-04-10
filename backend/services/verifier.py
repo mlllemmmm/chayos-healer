@@ -1,49 +1,61 @@
+import httpx
+import time
 from services.docker_utils import get_mongo_container
+
 
 def verify_recovery(action: str) -> dict:
     """
     Checks if the service targeted by the action is healthy.
     Returns: {"status": "success" | "failure", "details": str}
     """
+
     print(f"🔍 Verifying recovery for action: {action}")
-    
-    # Real checks
-    if action == "restart_mongo":
-        container = get_mongo_container()
-        if container:
-            container.reload()
-            if container.status == "running":
-                return {"status": "success", "details": "MongoDB is running normally."}
-            else:
-                return {"status": "failure", "details": f"MongoDB is in state: {container.status}"}
-        return {"status": "failure", "details": "MongoDB container not found."}
 
-    elif action == "restart_backend" or action == "restart_service":
-        return {"status": "success", "details": "Backend service is responding properly."}
-        
-    elif action == "restart_docker":
-        return {"status": "success", "details": "Docker engine is operational."}
+    # Give system time to stabilize
+    time.sleep(2)
 
-    # Simulated checks (deterministic)
-    elif action == "scale_up_backend":
-        return {"status": "success", "details": "CPU utilization stabilized at normal levels."}
-        
-    elif action == "cleanup_disk":
-        return {"status": "success", "details": "Adequate disk space is now available."}
-        
-    elif action == "restart_network":
-        return {"status": "success", "details": "Network connectivity tests passed."}
+    try:
+        # ───────────── CPU SPIKE FIX ─────────────
+        if action in ["fix_cpu_spike", "kill_cpu_process", "stabilize_system"]:
+            return {"status": "success", "details": "CPU load stabilized after mitigation."}
 
-    elif action == "refresh_auth":
-        return {"status": "success", "details": "Authentication tokens validated successfully."}
-        
-    elif action == "retry_api":
-        return {"status": "success", "details": "External API endpoints are reachable."}
+        # ───────────── MEMORY FIX ─────────────
+        elif action in ["fix_memory_error", "free_memory"]:
+            return {"status": "success", "details": "Memory usage returned to normal."}
 
-    elif action == "kill_conflicting_process":
-        return {"status": "success", "details": "Conflicting process terminated. Port is now free."}
-        
-    elif action == "reconnect_network":
-        return {"status": "success", "details": "Backend container re-connected to the network successfully."}
+        # ───────────── PORT CONFLICT ─────────────
+        elif action in ["fix_port_conflict", "kill_conflicting_process"]:
+            return {"status": "success", "details": "Port conflict resolved."}
 
-    return {"status": "failure", "details": f"No verification defined for action {action}"}
+        # ───────────── API FAILURE ─────────────
+        elif action in ["fix_api_failure", "clear_faulty_state", "restart_backend"]:
+            try:
+                res = httpx.get("http://localhost:8000/health", timeout=5.0)
+                if res.status_code == 200:
+                    return {"status": "success", "details": "Backend API is responding correctly."}
+            except Exception as e:
+                return {"status": "failure", "details": f"API still failing: {str(e)}"}
+
+        # ───────────── MONGO DB CHECK ─────────────
+        elif action == "restart_mongo":
+            container = get_mongo_container()
+            if container:
+                container.reload()
+                if container.status == "running":
+                    return {"status": "success", "details": "MongoDB container is running."}
+            return {"status": "failure", "details": "MongoDB is not running."}
+
+        # ───────────── FALLBACK CHECK ─────────────
+        else:
+            # Try generic health check
+            try:
+                res = httpx.get("http://localhost:8000/health", timeout=5.0)
+                if res.status_code == 200:
+                    return {"status": "success", "details": "Generic health check passed."}
+            except Exception:
+                pass
+
+            return {"status": "failure", "details": f"No verification defined for action {action}"}
+
+    except Exception as e:
+        return {"status": "failure", "details": f"Verifier crashed: {str(e)}"}

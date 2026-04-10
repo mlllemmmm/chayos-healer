@@ -11,7 +11,10 @@ from services.logger import get_logs
 from services.docker_utils import get_mongo_container, restart_container
 import psutil
 import time
+import os
 from fastapi import Request
+from services.logger import write_raw_log
+from datetime import datetime
 
 from services.state import state
 from services.playbook_manager import router as playbook_router
@@ -20,6 +23,20 @@ from services.scaler import router as scaler_router
 from services.metrics import router as metrics_router
 from services.metrics import collect_metrics_loop
 from services.scaler import monitor_and_scale
+
+async def event_loop_monitor():
+    """
+    Background worker that continuously measures event loop latency.
+    If delayed significantly, it simulates a real log line indicating starvation.
+    """
+    last_time = time.time()
+    while True:
+        await asyncio.sleep(0.5)
+        current_time = time.time()
+        latency = current_time - last_time - 0.5
+        if latency > 2.0:
+            write_raw_log(f"[{datetime.utcnow().isoformat()+'Z'}] [ERROR] [uvicorn] - WARNING: timeout / event loop blocked due to high CPU usage")
+        last_time = current_time
 
 app = FastAPI()
 
@@ -52,14 +69,24 @@ async def startup_event():
     asyncio.create_task(start_monitoring())
     asyncio.create_task(collect_metrics_loop())
     asyncio.create_task(monitor_and_scale())
+    asyncio.create_task(event_loop_monitor())
 
 @app.get("/")
 def home():
     return {"status": "Chaos Healer running"}
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 @app.get("/logs")
 def logs():
     return get_logs()
+
+@app.get("/force-500")
+def force_500():
+    write_raw_log(f"[{datetime.utcnow().isoformat()+'Z'}] [ERROR] [fastapi] - Internal Server Error: forced failure")
+    raise Exception("Forced failure")
 
 @app.get("/detect")
 def detect():

@@ -1,11 +1,14 @@
 from fastapi import APIRouter
 from services.docker_utils import get_mongo_container, stop_container
-from services.logger import log_event
-from services.healer import trigger_healer
+from services.logger import log_event, write_raw_log
+import time
+import multiprocessing
+import threading
+from services.state import state
 
-router = APIRouter()
+router = APIRouter(prefix="/inject")
 
-@router.post("/inject-failure")
+@router.post("/failure")
 def inject_failure(data: dict):
     service = data.get("service")
 
@@ -27,111 +30,208 @@ def inject_failure(data: dict):
     return {"status": "ignored"}
 
 
-def handle_injection(issue_key: str, error_msg: str, display_name: str):
-    log_event(
-        event="monitor",
-        message=f"Injected failure: {display_name}",
-        status="in-progress",
-        issue=issue_key
-    )
-    # Trigger healer directly
-    trigger_healer(issue=issue_key, raw_error=error_msg, source="inject")
-
-
-@router.post("/inject-mongo")
+@router.post("/mongo")
 def inject_mongo():
+    print("Attempting to inject MongoDB failure...")
     container = get_mongo_container()
     if container:
-        stop_container(container)
-    handle_injection("mongodb_down", "connection refused", "MongoDB Down")
-    return {"status": "MongoDB failure injected"}
+        print(f"Found container: {container.name}")
+        print("Stopping container...")
+        success = stop_container(container)
+        if success:
+            print("Container stopped successfully")
+            write_raw_log("MongoNetworkError: connection refused") # Simulation fallback
+            return {"status": "MongoDB failure injected (Docker container stopped)"}
+        else:
+            print("Error: Failed to stop container")
+            return {"status": "Failed to stop MongoDB container"}
+    
+    print("Error: MongoDB container not found")
+    write_raw_log("MongoNetworkError: connection refused") # Simulation fallback
+    return {"status": "MongoDB container not found (Used simulated failure)"}
 
-@router.post("/inject-backend")
+
+@router.post("/backend")
 def inject_backend():
-    handle_injection("backend_down", "502 bad gateway", "Backend Down")
-    return {"status": "Backend failure injected"}
+    print("Attempting to inject Backend failure...")
+    from services.docker_utils import get_backend_container
+    container = get_backend_container()
+    
+    if container:
+        print(f"Found container: {container.name}")
+        print("Stopping container...")
+        success = stop_container(container)
+        if success:
+            print("Container stopped successfully")
+            write_raw_log("502 bad gateway") # Simulation fallback
+            return {"status": "Backend failure injected (Docker container stopped)"}
+        else:
+            print("Error: Failed to stop backend container")
+            return {"status": "Failed to stop Backend container"}
+            
+    print("Backend container not found, attempting local process kill...")
+    import sys, subprocess, os, threading
+    
+    def kill_local_process():
+        try:
+            if sys.platform == 'win32':
+                # Windows
+                output = subprocess.check_output("netstat -ano | findstr :8000", shell=True).decode()
+                for line in output.splitlines():
+                    if "LISTENING" in line:
+                        pid = line.strip().split()[-1]
+                        if int(pid) != os.getpid():  # Avoid killing self if possible, though this process is the backend
+                            subprocess.run(f"taskkill /F /PID {pid}", shell=True)
+                        else:
+                            # If it's this exact process, wait briefly to return response, then exit
+                            threading.Timer(1.0, lambda: os._exit(1)).start()
+                        return True
+            else:
+                # Unix
+                output = subprocess.check_output("lsof -i :8000 -t", shell=True).decode()
+                pid = output.strip()
+                if pid:
+                    if int(pid) != os.getpid():
+                        subprocess.run(f"kill -9 {pid}", shell=True)
+                    else:
+                        threading.Timer(1.0, lambda: os._exit(1)).start()
+                    return True
+        except Exception as e:
+            print(f"Local kill failed: {e}")
+        return False
+        
+    # If the current process is the backend, self-terminate after returning
+    threading.Timer(1.0, lambda: os._exit(1)).start()
+    return {"status": "Backend failure injected (Local process killing)"}
 
-@router.post("/inject-cpu")
+
+def cpu_stress_worker():
+    import time
+    end = time.time() + 10
+    while time.time() < end:
+        pass
+
+
+@router.post("/cpu")
 def inject_cpu():
-    handle_injection("high_cpu", "cpu usage high", "High CPU")
-    return {"status": "High CPU injected"}
+    if state.cpu_stress_process is None or not state.cpu_stress_process.is_alive():
+        # 🔥 WRITE LOG (IMPORTANT)
+        write_raw_log("HIGH CPU usage detected")
 
-@router.post("/inject-memory")
+        p = multiprocessing.Process(target=cpu_stress_worker)
+        p.start()
+        state.cpu_stress_process = p
+
+        return {"status": "High CPU injected"}
+    
+    return {"status": "Already running"}
+
+@router.post("/memory")
 def inject_memory():
-    handle_injection("high_memory", "out of memory", "High Memory")
+    def _mem_worker():
+        import os
+        chunks = []
+        try:
+            # We want to hit the memory error boundary but do it safely.
+            max_chunks = 90 # arbitrary safe limit ~90MB
+            for i in range(120):
+                if len(chunks) >= max_chunks:
+                    raise MemoryError("safe limit reached")
+                chunks.append(" " * (1024 * 1024))
+                time.sleep(0.05)
+        except MemoryError:
+            write_raw_log(f"[{time.time()}] [ERROR] [uvicorn] - heap out of memory")
+        finally:
+            chunks.clear()
+            
+    threading.Thread(target=_mem_worker).start()
     return {"status": "High Memory injected"}
 
-@router.post("/inject-disk")
+@router.post("/disk")
 def inject_disk():
-    handle_injection("disk_full", "no space left", "Disk Full")
+    write_raw_log("no space left on device")
     return {"status": "Disk Full injected"}
 
-@router.post("/inject-crash")
+@router.post("/crash")
 def inject_crash():
-    handle_injection("crash_loop", "crash loop", "Service Crash Loop")
+    write_raw_log("service crashed repeatedly")
     return {"status": "Crash Loop injected"}
 
-@router.post("/inject-network")
+@router.post("/network")
 def inject_network():
-    handle_injection("network_issue", "dns error", "Network Issue")
+    write_raw_log("dns resolution failed")
     return {"status": "Network Issue injected"}
 
-@router.post("/inject-db-slow")
+@router.post("/db-slow")
 def inject_db_slow():
-    handle_injection("db_slow", "query timeout", "DB Slow")
+    write_raw_log("query timeout exceeded")
     return {"status": "DB Slow injected"}
 
-@router.post("/inject-auth")
+@router.post("/auth")
 def inject_auth():
-    handle_injection("auth_failure", "unauthorized", "Auth Failure")
+    write_raw_log("unauthorized access token invalid")
     return {"status": "Auth Failure injected"}
 
-@router.post("/inject-api")
+@router.post("/api-failure")
 def inject_api():
-    handle_injection("external_api_down", "api connection error", "API Failure")
+    def _api_worker():
+        import httpx
+        try:
+            httpx.get("http://localhost:8000/force-500", timeout=5)
+        except Exception:
+            pass
+            
+    threading.Thread(target=_api_worker).start()
     return {"status": "API Failure injected"}
 
-@router.post("/inject-docker")
+@router.post("/docker")
 def inject_docker():
-    handle_injection("docker_issue", "docker not running", "Docker Engine Down")
+    write_raw_log("docker not running")
     return {"status": "Docker Issue injected"}
-
-import subprocess
-import sys
-from services.state import state
 
 from services.docker_utils import get_backend_container, disconnect_from_network, inject_memory_pressure
 
-@router.post("/inject-memory-pressure")
+
+@router.post("/memory-pressure")
 def inject_memory_pressure_route():
     container = get_backend_container()
     if container:
         success = inject_memory_pressure(container)
         if success:
-            handle_injection("container_memory_pressure", "OOM detected: memory limit exceeded", "Memory Pressure")
+            write_raw_log("OOM detected: memory limit exceeded")
             return {"status": "Container Memory Pressure injected"}
         return {"status": "Failed to inject memory pressure"}
     return {"status": "Backend container not found"}
 
-@router.post("/inject-network-isolation")
+@router.post("/network-isolation")
 def inject_network_isolation():
     container = get_backend_container()
     if container:
         success = disconnect_from_network(container, "chaos-net")
         if success:
-            handle_injection("container_network_isolation", "connection timeout", "Network Isolation")
+            write_raw_log("connection timeout")
             return {"status": "Container Network Isolation injected"}
         return {"status": "Failed to disconnect container"}
     return {"status": "Backend container not found"}
 
-@router.post("/inject-port-conflict")
+@router.post("/port-conflict")
 def inject_port_conflict():
+    import subprocess
+    import sys
+    import os
+    from services.logger import write_raw_log
     try:
         if state.port_conflict_process is None or state.port_conflict_process.poll() is not None:
-            proc = subprocess.Popen([sys.executable, "-m", "http.server", "8000"])
+            log_path = os.path.join(os.path.dirname(__file__), '..', '..', 'logs', 'app.log')
+            f = open(log_path, 'a', encoding="utf-8")
+            backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            # Attempt to start another backend instance on 8000 using sys.executable
+            # Ensure PYTHONIOENCODING is utf-8 so emojis don't crash Windows cp1252 charmap
+            env = dict(os.environ)
+            env["PYTHONIOENCODING"] = "utf-8"
+            proc = subprocess.Popen([sys.executable, "-m", "uvicorn", "main:app", "--port", "8000"], stderr=f, stdout=f, cwd=backend_dir, env=env)
             state.port_conflict_process = proc
-            handle_injection("port_conflict", "Address already in use", "Port Conflict")
             return {"status": "Port Conflict injected"}
     except Exception as e:
-        pass
-    return {"status": "Port conflict already running"}
+        write_raw_log(f"Failed to start port conflict process: {e}")
+    return {"status": "Port conflict already running"}

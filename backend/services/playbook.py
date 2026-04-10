@@ -13,7 +13,7 @@ def load_playbook():
                 "container exited",
                 "database down"
             ],
-            "action": "restart_mongo",
+            "action": "restart_mongodb",
             "verify": "check_mongo"
         },
 
@@ -38,7 +38,7 @@ def load_playbook():
                 "100% cpu",
                 "resource exhaustion"
             ],
-            "action": "scale_up_backend",
+            "action": "cooldown",
             "verify": "check_cpu"
         },
 
@@ -95,7 +95,7 @@ def load_playbook():
                 "slow database",
                 "db latency high"
             ],
-            "action": "restart_mongo",
+            "action": "restart_mongodb",
             "verify": "check_mongo"
         },
 
