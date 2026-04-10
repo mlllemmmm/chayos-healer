@@ -6,16 +6,8 @@ export default function ControlPanel({ onInject, onRefreshLogs, isLoading }) {
     { id: 'backend', label: 'Backend Down', icon: ShieldAlert },
     { id: 'cpu', label: 'High CPU', icon: ShieldAlert },
     { id: 'memory', label: 'High Memory', icon: ShieldAlert },
-    { id: 'disk', label: 'Disk Full', icon: ShieldAlert },
-    { id: 'crash', label: 'Crash Loop', icon: ShieldAlert },
-    { id: 'network', label: 'Network Issue', icon: ShieldAlert },
-    { id: 'db-slow', label: 'DB Slow', icon: ShieldAlert },
-    { id: 'auth', label: 'Auth Failure', icon: ShieldAlert },
     { id: 'api', label: 'API Failure', icon: ShieldAlert },
-    { id: 'docker', label: 'Docker Engine', icon: ShieldAlert },
     { id: 'port-conflict', label: 'Port Conflict', icon: ShieldAlert },
-    { id: 'network-isolation', label: 'Network Isolation', icon: ShieldAlert },
-    { id: 'memory-pressure', label: 'Memory Pressure', icon: ShieldAlert },
     { id: 'unknown', label: 'Unknown Error', icon: Brain },
   ];
 

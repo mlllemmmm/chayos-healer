@@ -8,6 +8,7 @@ class SharedState:
         self.scaling_instances = 1
         self.scaling_reason = "Normal operation"
         self.port_conflict_process = None
+        self.cpu_stress_process = None
         
         # Keep metrics as a list: { "timestamp": float, "cpu": float, "memory": float }
         self.metrics_history = []

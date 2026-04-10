@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import List, Dict
+import os
 
 # Centralized in-memory log storage
 _logs: List[Dict] = []
@@ -29,6 +30,18 @@ def add_log(
     }
     # Insert at the beginning so the newest is first, or standard append
     _logs.insert(0, new_log)
+    
+    # Write directly to logs/app.log
+    write_raw_log(f"[{new_log['timestamp']}] [{log_type.upper()}] [{source}] - {message}")
+
+def write_raw_log(message: str):
+    """
+    Writes a raw string directly to logs/app.log to allow simulating native error tracebacks.
+    """
+    os.makedirs(os.path.join(os.path.dirname(__file__), '..', '..', 'logs'), exist_ok=True)
+    log_file = os.path.join(os.path.dirname(__file__), '..', '..', 'logs', 'app.log')
+    with open(log_file, "a") as f:
+        f.write(message + "\n")
 
 def log_event(event: str, message: str, status: str = None, issue: str = None, action: str = None):
     """

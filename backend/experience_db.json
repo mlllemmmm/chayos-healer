@@ -428,5 +428,49 @@
     },
     "reward": 9,
     "source": "bandit"
+  },
+  {
+    "timestamp": "2026-04-10T18:42:02.351574Z",
+    "context": {
+      "service": "app",
+      "symptom": "unknown_failure",
+      "has_error_log": 1,
+      "has_connection_refused": 0,
+      "has_mongodb": 0,
+      "has_eaddrinuse": 0,
+      "has_memory": 0,
+      "container_running": 0,
+      "source_monitor": 1,
+      "source_user": 0
+    },
+    "action_id": "restart_app",
+    "success": {
+      "status": "failure",
+      "details": "No verification defined for action app"
+    },
+    "reward": 9,
+    "source": "bandit"
+  },
+  {
+    "timestamp": "2026-04-10T18:42:36.024939Z",
+    "context": {
+      "service": "app",
+      "symptom": "unknown_failure",
+      "has_error_log": 1,
+      "has_connection_refused": 0,
+      "has_mongodb": 0,
+      "has_eaddrinuse": 0,
+      "has_memory": 0,
+      "container_running": 0,
+      "source_monitor": 1,
+      "source_user": 0
+    },
+    "action_id": "restart_app",
+    "success": {
+      "status": "failure",
+      "details": "No verification defined for action app"
+    },
+    "reward": 9,
+    "source": "user"
   }
 ]
